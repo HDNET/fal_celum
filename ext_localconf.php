@@ -7,7 +7,7 @@ defined('TYPO3_MODE') or die('Access denied.');
     \HDNET\FalCelum\Driver\CelumDriver::class,
     \HDNET\FalCelum\Driver\CelumDriver::DRIVER_TYPE,
     'Celum',
-    'FILE:EXT:' . \HDNET\FalCelum\Driver\CelumDriver::EXTENSION_KEY . '/Configuration/FlexForm/CelumDriverFlexForm.xml'
+    'FILE:EXT:' . \HDNET\FalCelum\Configuration::EXTENSION_KEY . '/Configuration/FlexForm/CelumDriverFlexForm.xml'
 );
 
 // Extractor

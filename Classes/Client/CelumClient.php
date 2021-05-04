@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace HDNET\FalCelum\Client;
 
 use GuzzleHttp\Client;
+use HDNET\FalCelum\Cache;
+use HDNET\FalCelum\Configuration;
+use HDNET\FalCelum\Encryption;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use TYPO3\CMS\Core\Cache\CacheManager;
@@ -20,13 +23,11 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
 {
     use LoggerAwareTrait;
 
-    public const LIFE_TIME = 30 * 60 - 10;
     protected $celumUrl;
     protected $cora;
     protected $locale;
     protected $defaultLocale;
-    /** @var FrontendInterface */
-    protected $cache;
+    protected Cache $cache;
     protected $storage;
     protected $directDownload;
     private $provider;
@@ -38,7 +39,7 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
 
     public function __construct(array $config, $storage)
     {
-        $res = $this->decrypt($config['licenseKey']);
+        $res = GeneralUtility::makeInstance(Encryption::class)->decrypt($config['licenseKey']);
         // Impossible to throw exceptions on invalid license, somehow there are instances created before the configuration is entered.
         if (preg_match('/^(.*)_([^_]+)$/', $res, $matches) and $matches[2] > time()) {
             $this->celumUrl = rtrim($matches[1]);
@@ -54,7 +55,7 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
         $this->defaultLocale = $config['defaultLocale'];
         $this->secret = $config['directDownloadSecret'];
         $this->storage = $storage;
-        $this->cache = GeneralUtility::makeInstance(CacheManager::class)->getCache(CelumDriver::EXTENSION_KEY);
+        $this->cache = GeneralUtility::makeInstance(Cache::class);
         $this->client = new Client(['base_uri' => $this->cora]);
         $this->options = ['headers' => ['Authorization' => 'celumApiKey ' . $config['celumApiKey']]];
     }
@@ -80,7 +81,8 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
     public function getFolderInfo($identifier)
     {
         $key = str_replace('/', '_', $identifier);
-        if (!$this->cache->has($key)) {
+
+        return $this->cache->cache($key, function () use ($identifier) {
             $id = $this->extractId($identifier);
             $continue = true;
             $top = 200;
@@ -88,7 +90,7 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
                 $continue = false;
                 $response = $this->client->request('GET', 'Nodes(' . $id . ')?$expand=children($select=id%3B$top=' . $top . '%3B$skip=' . $skip . '),assets($select=id%3B$top=' . $top . '%3B$skip=' . $skip . ')&$select=id,name,children,assets', $this->options)->getBody();
                 if ($response) {
-                    $response = json_decode($response, true);
+                    $response = json_decode((string) $response, true);
                     if ($skip == 0) {
                         $data = ['info' => ['identifier' => $identifier, 'name' => $this->extractName($response['name']), 'storage' => $this->storage], 'children' => [], 'assets' => []];
                     }
@@ -115,23 +117,20 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
                         }
                     }
                 } elseif ($skip == 0) {
-                    $this->cache->set($key, ['info' => null, 'children' => [], 'assets' => []], [], self::LIFE_TIME);
-                    return $this->cache->get($key);
+                    return ['info' => null, 'children' => [], 'assets' => []];
                 }
             }
-            $this->cache->set($key, $data, [], self::LIFE_TIME);
-        }
-        $this->logger->debug("getFolderInfo($identifier): " . json_encode($this->cache->get($key)));
-        return $this->cache->get($key);
+            return $data;
+        });
     }
 
     public function getFileInfo($identifier)
     {
         $key = str_replace('/', '_', $identifier);
-        if (!$this->cache->has($key)) {
+        return $this->cache->cache($key, function () use ($identifier) {
             $response = $this->client->request('GET', 'Assets(' . $this->extractId($identifier) . ')?$select=id,name,fileInformation,fileProperties,modificationInformation,previewInformation,fileCategory&$expand=publicUrls', $this->options)->getBody();
             if ($response) {
-                $response = json_decode($response, true);
+                $response = json_decode((string) $response, true);
                 foreach ($response['fileProperties'] as $prop) {
                     if ($prop['name'] === 'width') {
                         $width = $prop['value'];
@@ -183,28 +182,27 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
                         $name .= $ext;
                     }
                 }
-                $this->cache->set($key, ['info' => [
-                    'identifier' => $identifier,
-                    'name' => $name,
-                    'storage' => $this->storage,
-                    'size' => $response['fileInformation']['originalFileSize'],
-                    'width' => $width,
-                    'height' => $height,
-                    'mimetype' => $type . '/' . $response['fileInformation']['fileExtension'],
-                    'ctime' => strtotime($response['modificationInformation']['creationDateTime']),
-                    'mtime' => strtotime($response['modificationInformation']['lastModificationDateTime']),
-                ],
+                return [
+                    'info' => [
+                        'identifier' => $identifier,
+                        'name' => $name,
+                        'storage' => $this->storage,
+                        'size' => $response['fileInformation']['originalFileSize'],
+                        'width' => $width,
+                        'height' => $height,
+                        'mimetype' => $type . '/' . $response['fileInformation']['fileExtension'],
+                        'ctime' => strtotime($response['modificationInformation']['creationDateTime']),
+                        'mtime' => strtotime($response['modificationInformation']['lastModificationDateTime']),
+                    ],
 //                    'preview' => $response['previewInformation']['previewUrl'],
 //                    'thumbnail' => $response['previewInformation']['thumbUrl'],
                     'publicUrl' => $publicUrl,
                     'extension' => $response['fileInformation']['fileExtension'],
-                ], [], self::LIFE_TIME);
-            } else {
-                $this->cache->set($key, ['info' => null], [], self::LIFE_TIME);
+                ];
             }
-        }
-        $this->logger->debug("getFileInfo($identifier)" . json_encode($this->cache->get($key)));
-        return $this->cache->get($key);
+
+            return ['info' => null];
+        });
     }
 
     public function getUrl($identifier, $type = 'publicUrl')
@@ -212,25 +210,5 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
         $ret = $this->getFileInfo($identifier)[$type];
         $this->logger->debug("getUrl($identifier, $type): $ret");
         return $ret;
-    }
-
-    private function decode_base64($sData)
-    {
-        $sBase64 = strtr($sData, '-_', '+/');
-        return base64_decode($sBase64 . '==');
-    }
-
-    private function decrypt($sData)
-    {
-        $secretKey = "ZbMchtd9DivzjPDi5QIio1iVERFnNZiSE33QKY3Gw9rYfCNLFiKloJQt3zi4";
-        $sResult = '';
-        $sData = $this->decode_base64($sData);
-        for ($i = 0; $i < strlen($sData); $i++) {
-            $sChar = substr($sData, $i, 1);
-            $sKeyChar = substr($secretKey, ($i % strlen($secretKey)) - 1, 1);
-            $sChar = chr(ord($sChar) - ord($sKeyChar));
-            $sResult .= $sChar;
-        }
-        return $sResult;
     }
 }

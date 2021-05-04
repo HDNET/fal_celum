@@ -81,4 +81,9 @@ abstract class AbstractReadOnlyDriver implements DriverInterface
     {
         throw new Exception('Storage is read-only.');
     }
+
+    public function getPermissions($identifier)
+    {
+        return ['r' => true, 'w' => false];
+    }
 }

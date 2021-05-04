@@ -13,19 +13,20 @@ use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Log\Logger;
 use TYPO3\CMS\Core\SingletonInterface;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
 
 class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface, SingletonInterface
 {
     use LoggerAwareTrait;
 
-    public const EXTENSION_KEY = 'celum_connect_fal';
     public const DRIVER_TYPE = 'CelumDriver';
+
     public const ROOT_FOLDER_IDENTIFIER = '/';
+
     public const ROOT_FOLDER_NAME = 'Celum';
 
-    /** @var $client CelumClient */
-    protected $client;
+    protected CelumClient $client;
     protected $roots;
     protected $capabilities;
     protected $configuration;
@@ -34,9 +35,6 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
     public function __construct(array $configuration = [])
     {
         $this->configuration = $configuration;
-        $this->instance = random_int(0, getrandmax());
-        $this->log = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(LogManager::class)->getLogger(__CLASS__);
-        $this->logger->debug("__construct(" . json_encode($configuration) . ")");
         $this->capabilities = ResourceStorage::CAPABILITY_BROWSABLE | ResourceStorage::CAPABILITY_PUBLIC;
     }
 
@@ -59,8 +57,7 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
     public function initialize(): void
     {
         $this->logger->debug("initialize()");
-        $this->client = new CelumClient($this->configuration, $this->storageUid);
-        $_SESSION['celum_client'] = $this->client;
+        $this->client = GeneralUtility::makeInstance(CelumClient::class, $this->configuration, $this->storageUid);
     }
 
     /**
@@ -228,22 +225,9 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
     public function getFileForLocalProcessing($fileIdentifier, $writable = true)
     {
         $this->logger->debug("getFileForLocalProcessing($fileIdentifier, $writable)");
-        $tmp = \TYPO3\CMS\Core\Utility\GeneralUtility::tempnam('fal-tempfile-', '.' . $this->client->getFileInfo($fileIdentifier)['extension']);
+        $tmp = GeneralUtility::tempnam('fal-tempfile-', '.' . $this->client->getFileInfo($fileIdentifier)['extension']);
         file_put_contents($tmp, fopen($this->client->getUrl($fileIdentifier, 'publicUrl'), 'r'));
         return $tmp;
-    }
-
-    /**
-     * Returns the permissions of a file/folder as an array
-     * (keys r, w) of boolean flags
-     *
-     * @param string $identifier
-     * @return array
-     */
-    public function getPermissions($identifier)
-    {
-        $this->logger->debug("getPermissions($identifier)");
-        return ['r' => true, 'w' => false];
     }
 
     /**
@@ -310,6 +294,8 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
         if (array_key_exists($folderIdentifier, $cache)) {
             return $cache[$folderIdentifier];
         }
+
+        // @todo move to Cache class
 
         $folderIdentifier = rtrim($folderIdentifier, '/\\') . '/';
         if ($folderIdentifier == self::ROOT_FOLDER_IDENTIFIER) {
