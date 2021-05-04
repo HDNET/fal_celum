@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HDNET\FalCelum\Driver;
 
+use HDNET\FalCelum\Cache;
 use HDNET\FalCelum\Client\CelumClient;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -27,6 +28,7 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
     public const ROOT_FOLDER_NAME = 'Celum';
 
     protected CelumClient $client;
+    protected Cache $cache;
     protected $roots;
     protected $capabilities;
     protected $configuration;
@@ -57,7 +59,9 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
     public function initialize(): void
     {
         $this->logger->debug("initialize()");
-        $this->client = GeneralUtility::makeInstance(CelumClient::class, $this->configuration, $this->storageUid);
+        // , $this->storageUid
+        $this->client = GeneralUtility::makeInstance(CelumClient::class, $this->configuration);
+        $this->cache = GeneralUtility::makeInstance(Cache::class);
     }
 
     /**
@@ -290,22 +294,19 @@ class CelumDriver extends AbstractReadOnlyDriver implements LoggerAwareInterface
      */
     public function getFolderInfoByIdentifier($folderIdentifier)
     {
-        static $cache = [];
-        if (array_key_exists($folderIdentifier, $cache)) {
-            return $cache[$folderIdentifier];
-        }
-
-        // @todo move to Cache class
-
-        $folderIdentifier = rtrim($folderIdentifier, '/\\') . '/';
-        if ($folderIdentifier == self::ROOT_FOLDER_IDENTIFIER) {
-            $ret = ['identifier' => self::ROOT_FOLDER_IDENTIFIER, 'name' => self::ROOT_FOLDER_NAME, 'storage' => $this->storageUid];
-        } else {
-            $ret = $this->client->getFolderInfo($folderIdentifier)['info'];
-        }
-        $this->logger->debug("getFolderInfoByIdentifier($folderIdentifier): " . json_encode($ret));
-        $cache[$folderIdentifier] = $ret;
-        return $ret;
+        return $this->cache->cacheRuntime($folderIdentifier, function () use ($folderIdentifier) {
+            $folderIdentifier = rtrim($folderIdentifier, '/\\') . '/';
+            if ($folderIdentifier == self::ROOT_FOLDER_IDENTIFIER) {
+                $ret = ['identifier' => self::ROOT_FOLDER_IDENTIFIER, 'name' => self::ROOT_FOLDER_NAME, 'storage' => $this->storageUid];
+            } else {
+                $ret = $this->client->getFolderInfo($folderIdentifier)['info'];
+                if (is_array($ret)) {
+                    $ret['storage'] = $this->storageUid;
+                }
+            }
+            $this->logger->debug("getFolderInfoByIdentifier($folderIdentifier): " . json_encode($ret));
+            return $ret;
+        });
     }
 
     /**

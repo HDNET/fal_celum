@@ -28,7 +28,6 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
     protected $locale;
     protected $defaultLocale;
     protected Cache $cache;
-    protected $storage;
     protected $directDownload;
     private $provider;
     private $description;
@@ -37,8 +36,12 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
     private $options;
     private $format;
 
-    public function __construct(array $config, $storage)
+    public function __construct(Configuration $configuration)
     {
+
+        // Todo migrate to configuration
+
+
         $res = GeneralUtility::makeInstance(Encryption::class)->decrypt($config['licenseKey']);
         // Impossible to throw exceptions on invalid license, somehow there are instances created before the configuration is entered.
         if (preg_match('/^(.*)_([^_]+)$/', $res, $matches) and $matches[2] > time()) {
@@ -54,7 +57,6 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
         $this->locale = $config['locale'];
         $this->defaultLocale = $config['defaultLocale'];
         $this->secret = $config['directDownloadSecret'];
-        $this->storage = $storage;
         $this->cache = GeneralUtility::makeInstance(Cache::class);
         $this->client = new Client(['base_uri' => $this->cora]);
         $this->options = ['headers' => ['Authorization' => 'celumApiKey ' . $config['celumApiKey']]];
@@ -92,7 +94,14 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
                 if ($response) {
                     $response = json_decode((string) $response, true);
                     if ($skip == 0) {
-                        $data = ['info' => ['identifier' => $identifier, 'name' => $this->extractName($response['name']), 'storage' => $this->storage], 'children' => [], 'assets' => []];
+                        $data = ['info' =>
+                            [
+                                'identifier' => $identifier,
+                                'name' => $this->extractName($response['name']),
+                            ],
+                            'children' => [],
+                            'assets' => []
+                        ];
                     }
                     if (isset($response['children'])) {
                         $c = count($response['children']);
@@ -186,7 +195,6 @@ class CelumClient implements LoggerAwareInterface, SingletonInterface
                     'info' => [
                         'identifier' => $identifier,
                         'name' => $name,
-                        'storage' => $this->storage,
                         'size' => $response['fileInformation']['originalFileSize'],
                         'width' => $width,
                         'height' => $height,

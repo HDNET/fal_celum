@@ -7,5 +7,9 @@ namespace HDNET\FalCelum;
 class Configuration
 {
     public const EXTENSION_KEY = 'fal_celum';
-    // Configuration based on the FlexForm configuration
+
+    static public function build(array $configuration)
+    {
+
+    }
 }

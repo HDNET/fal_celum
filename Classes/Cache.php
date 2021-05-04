@@ -16,6 +16,8 @@ class Cache
 
     protected FrontendInterface $internalCache;
 
+    protected static array $runTimeCache = [];
+
     public function __construct()
     {
         $this->internalCache = GeneralUtility::makeInstance(CacheManager::class)->getCache(self::IDENTIFIER);
@@ -31,7 +33,14 @@ class Cache
         return $result;
     }
 
-    public function cacheRuntime(string $identifier, callable $callback): void
+    public function cacheRuntime(string $identifier, callable $callback)
     {
+        if (array_key_exists($identifier, self::$runTimeCache)) {
+            return self::$runTimeCache[$identifier];
+        }
+
+        $result = $callback();
+        self::$runTimeCache[$identifier] = $result;
+        return $result;
     }
 }

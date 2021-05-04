@@ -1,4 +1,4 @@
-# EXT:fal_celum
+# EXT:fal_celum - Current state is WIP
 
 > Connect TYPO3 with Celum!
 
@@ -15,7 +15,10 @@
 - Move licenseKey decrypt to class
 - Drop useless "instance" for logging (logging has already a random request ID)
 - Fix "ext_emconf.php" (DO NOT USE STATIC Extension Key there!)
+- Remove useless "storage" in Celum client (not needed in client)
 
 ## ToDo:
 
 - Configuration Object
+- Running version
+- Runtime Cache
