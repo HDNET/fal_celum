@@ -1,0 +1,46 @@
+{
+	"name": "hdnet/fal-celum",
+	"type": "typo3-cms-extension",
+	"description": "Provides a smart Celum driver integration for TYPO3.",
+	"keywords": [
+		"celum",
+		"fal"
+	],
+	"require": {
+		"php": "^7.4||^8.0",
+		"typo3/cms-core": "^10.4||^11.1"
+	},
+	"require-dev": {
+		"friendsofphp/php-cs-fixer": "^2.14"
+	},
+	"replace": {
+		"hdnet/fal-celum": "self.version"
+	},
+	"autoload": {
+		"psr-4": {
+			"HDNET\\FalCelum\\": "Classes/"
+		}
+	},
+	"config": {
+		"vendor-dir": ".Build/vendor",
+		"bin-dir": ".Build/bin"
+	},
+	"extra": {
+		"typo3/cms": {
+			"cms-package-dir": "{$vendor-dir}/typo3/cms",
+			"web-dir": ".Build/Web",
+			"Package": {
+				"partOfMinimalUsableSystem": true
+			},
+			"extension-key": "fal_celum"
+		}
+	},
+	"scripts": {
+		"code": [
+			"@tool:php-cs-fixer"
+		],
+		"tool:php-cs-fixer": [
+			"php-cs-fixer fix --config .phpcs"
+		]
+	}
+}
