@@ -1,6 +1,7 @@
 <?php
 
-$EM_CONF['celum_connect_fal'] = [
+/** @var $_EXTKEY string */
+$EM_CONF[$_EXTKEY] = [
     'title' => 'Celum (FAL)',
     'description' => 'Provides a smart Celum driver integration for TYPO3.',
     'category' => 'be',

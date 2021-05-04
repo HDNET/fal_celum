@@ -14,6 +14,7 @@
 - No Session state for Celum Client
 - Move licenseKey decrypt to class
 - Drop useless "instance" for logging (logging has already a random request ID)
+- Fix "ext_emconf.php" (DO NOT USE STATIC Extension Key there!)
 
 ## ToDo:
 
